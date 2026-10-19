@@ -1,0 +1,9 @@
+node_modules/
+__pycache__/
+*.gcode
+# build outputs other than index.html (regenerate with src/build_page.py)
+cuteflexi_studio.html
+cuteflexi_studio_artifact.html
+# slicing work directories
+pc_run*/
+out/

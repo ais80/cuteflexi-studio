@@ -1,0 +1,11 @@
+{
+  "name": "cuteflexi-studio",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Print-in-place flexi pet generator: manifold-3d CSG hinges, hinged wings and flippers, snap-on add-ons, printer-aware 3MF export",
+  "type": "commonjs",
+  "dependencies": {
+    "manifold-3d": "^3.4.1",
+    "three": "^0.160.0"
+  }
+}

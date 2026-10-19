@@ -1,0 +1,1025 @@
+<title>CuteFlexi Studio</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+</script>
+<style>
+  /* Layout: full-height 3D viewport beside a scrolling builder drawer (stacked on phones). Deliberately dark studio look. */
+  :root {
+    color-scheme: dark;
+    --bg: #090d16;
+    --fg: #f8fafc;
+    --panel: #0f172a;
+    --accent: #10b981;
+    --muted: #94a3b8;
+    --font-ui: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  }
+  html, body { height: 100%; }
+  [hidden] { display: none !important; }
+  body { margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); font-family: var(--font-ui); }
+  #app { height: 100%; }
+  .font-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .custom-scroll::-webkit-scrollbar { width: 6px; }
+  .custom-scroll::-webkit-scrollbar-track { background: #0b1120; }
+  .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+  .preset-card.active { background: rgba(16, 185, 129, 0.18); border-color: var(--accent); color: #ecfdf5; box-shadow: 0 0 16px rgba(16, 185, 129, 0.28); }
+  .pose-btn.active, .cam-btn.active, .printer-btn.active, .mode-btn.active, .joint-btn.active {
+    background: var(--accent); color: #042f2e; font-weight: 700; border-color: #34d399; box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
+  }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }
+  input[type="range"] { accent-color: var(--accent); }
+  input[type="color"] { -webkit-appearance: none; border: none; background: transparent; }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  input[type="color"]::-webkit-color-swatch { border: 1.5px solid #475569; border-radius: 6px; }
+  #engineVeil { transition: opacity .3s; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div id="app" class="flex flex-col lg:flex-row w-full select-none overflow-hidden">
+
+  <!-- ======================== 3D VIEWPORT ======================== -->
+  <main class="relative flex-1 h-1/2 lg:h-full flex flex-col bg-slate-950 overflow-hidden">
+
+    <header class="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+      <div class="flex items-center gap-3 bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-700/80 pointer-events-auto shadow-2xl">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-xl shadow-inner">🦎</div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-extrabold text-xs tracking-wider uppercase text-white">CuteFlexi Studio</h1>
+            <span class="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.5 rounded-md">v5 CSG engine</span>
+          </div>
+          <p class="hidden sm:block text-[10px] text-slate-400">Print-in-place hinges · support-free · 3MF for Bambu Studio &amp; Snapmaker Orca</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1.5 pointer-events-auto flex-wrap">
+        <button id="btnCutaway" class="bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/50 text-cyan-300 text-xs font-bold px-3 py-2 rounded-xl shadow-lg transition flex items-center gap-1.5">
+          <span>🔪</span> <span id="cutawayText">Slice Through Joints</span>
+        </button>
+        <button id="btnWiggle" class="bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/50 text-amber-300 text-xs font-semibold px-3 py-2 rounded-xl shadow-lg transition flex items-center gap-1.5">
+          <span>〰️</span> <span id="wiggleText">Wiggle Test</span>
+        </button>
+        <button id="btnRandom" class="bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-semibold px-3 py-2 rounded-xl shadow-lg transition flex items-center gap-1.5">
+          <span>🎲</span> Randomize
+        </button>
+        <button id="btnExport3MF" class="bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 text-xs font-extrabold px-3.5 py-2 rounded-xl shadow-lg shadow-emerald-950/50 transition flex items-center gap-1.5">
+          <span>⬇️</span> Export 3MF
+        </button>
+        <button id="btnExportSTL" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-bold px-3 py-2 rounded-xl shadow-lg transition">
+          STL
+        </button>
+      </div>
+    </header>
+
+    <div id="bedWarningBanner" hidden class="absolute top-20 left-1/2 -translate-x-1/2 z-30 bg-rose-950/95 border border-rose-500/80 text-rose-200 px-4 py-2 rounded-xl shadow-2xl flex items-center gap-3 text-xs backdrop-blur-md">
+      <span>⚠️ <strong>Does not fit this plate, even turned.</strong> <span id="warnLen">195</span> mm on a <span id="warnBed">180</span> mm plate.</span>
+      <button id="btnAutoFit" class="bg-rose-500 hover:bg-rose-400 text-slate-950 font-extrabold px-2.5 py-1 rounded-lg transition shadow">Curl to fit</button>
+    </div>
+
+    <div id="toast" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 border border-emerald-500/80 text-emerald-300 px-4 py-2 rounded-xl shadow-2xl text-xs font-bold transition-all duration-300 opacity-0 pointer-events-none flex items-center gap-2">
+      <span id="toastIcon">✅</span>
+      <span id="toastMsg"></span>
+    </div>
+
+    <div class="absolute top-36 left-4 z-20 hidden sm:flex flex-col gap-1 pointer-events-auto bg-slate-900/85 backdrop-blur-md p-1.5 rounded-xl border border-slate-700/70 shadow-xl">
+      <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 px-1 pt-0.5">Camera View</span>
+      <button data-cam="iso" class="cam-btn active text-[10px] px-2 py-1 rounded-lg bg-slate-800/80 text-slate-300 hover:bg-slate-700 transition text-left">📐 Perspective</button>
+      <button data-cam="joint" class="cam-btn text-[10px] px-2 py-1 rounded-lg bg-slate-800/80 text-slate-300 hover:bg-slate-700 transition text-left">🔍 Joint Close-up</button>
+      <button data-cam="top" class="cam-btn text-[10px] px-2 py-1 rounded-lg bg-slate-800/80 text-slate-300 hover:bg-slate-700 transition text-left">⬇️ Top View</button>
+      <button data-cam="bottom" class="cam-btn text-[10px] px-2 py-1 rounded-lg bg-slate-800/80 text-slate-300 hover:bg-slate-700 transition text-left">⬆️ Underside</button>
+    </div>
+
+    <div id="canvasContainer" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+    <div id="engineVeil" class="absolute inset-0 z-40 flex items-center justify-center bg-slate-950/80 pointer-events-none">
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl px-5 py-4 text-sm text-slate-200 max-w-xs text-center">
+        <div id="engineMsg" class="font-semibold">Loading the geometry engine…</div>
+        <div class="text-[11px] text-slate-400 mt-1">manifold-3d builds every body as a closed solid.</div>
+      </div>
+    </div>
+
+    <footer class="absolute bottom-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+      <div class="bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700/80 text-xs text-slate-300 flex flex-wrap items-center gap-3.5 shadow-xl pointer-events-auto">
+        <div>
+          <span class="text-slate-500 text-[9px] uppercase font-bold block">Printer Plate</span>
+          <span id="statPrinter" class="font-bold text-emerald-400">Bambu X1 / P1 / A1</span>
+        </div>
+        <div class="h-6 w-px bg-slate-800 hidden sm:block"></div>
+        <div>
+          <span class="text-slate-500 text-[9px] uppercase font-bold block">Hinges</span>
+          <span id="statStrength" class="font-semibold text-emerald-300 font-mono">–</span>
+        </div>
+        <div class="h-6 w-px bg-slate-800 hidden sm:block"></div>
+        <div>
+          <span class="text-slate-500 text-[9px] uppercase font-bold block">Size L × W × H</span>
+          <span id="statSize" class="font-semibold text-white font-mono">–</span>
+        </div>
+        <div class="h-6 w-px bg-slate-800 hidden md:block"></div>
+        <div class="hidden md:block">
+          <span class="text-slate-500 text-[9px] uppercase font-bold block">Air Gap</span>
+          <span id="statClearance" class="font-semibold text-amber-300 font-mono">–</span>
+        </div>
+        <div class="h-6 w-px bg-slate-800 hidden md:block"></div>
+        <div class="hidden md:block">
+          <span class="text-slate-500 text-[9px] uppercase font-bold block">Build</span>
+          <span id="statBuild" class="font-semibold text-slate-300 font-mono">–</span>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <!-- ======================== BUILDER DRAWER ======================== -->
+  <aside class="w-full lg:w-[420px] h-1/2 lg:h-full bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800/90 flex flex-col z-30 shadow-2xl">
+
+    <div class="px-4 py-3 border-b border-slate-800 bg-slate-900/95 shrink-0">
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">8 Species Presets</span>
+        <span id="activePresetTag" class="text-[10px] text-emerald-400 font-bold uppercase">Dragon</span>
+      </div>
+      <div class="grid grid-cols-4 gap-1.5" id="presetBar">
+        <button data-preset="dragon" class="preset-card active flex flex-col items-center py-1.5 px-1 rounded-xl bg-slate-800/90 border border-slate-700/80 hover:bg-slate-800 transition text-xs"><span class="text-base">🐲</span><span class="text-[10px] font-semibold mt-0.5">Dragon</span></button>
+        <button data-preset="cat" class="preset-card flex flex-col items-center py-1.5 px-1 rounded-xl bg-slate-800/90 border border-slate-700/80 hover:bg-slate-800 transition text-xs"><span class="text-base">🐱</span><span class="text-[10px] font-semibold mt-0.5">Cat</span></button>
+        <button data-preset="bunny" class="preset-card flex flex-col items-center py-1.5 px-1 rounded-xl bg-slate-800/90 border border-slate-700/80 hover:bg-slate-800 transition text-xs"><span class="text-base">🐰</span><span class="text-[10px] font-semibold mt-0.5">Bunny</span></button>
+        <button data-preset="trex" class="preset-card flex flex-col items-center py-1.5 px-1 rounded-xl bg-slate-800/90 border border-slate-700/80 hover:bg-slate-800 transition text-xs"><span class="text-base">🦖</span><span class="text-[10px] font-semibold mt-0.5">T-Rex</span></button>
+        <button data-preset="narwhal" class="preset-card flex flex-col items-center py-1.5 px-1 rounded-xl bg-slate-800/90 border border-slate-700/80 hover:bg-slate-800 transition text-xs"><span class="text-base">🦄</span><span class="text-[10px] font-semibold mt-0.5">Narwhal</span></button>
+        <button data-preset="bee" class="preset-card flex flex-col items-center py-1.5 px-1 rounded-xl bg-slate-800/90 border border-slate-700/80 hover:bg-slate-800 transition text-xs"><span class="text-base">🐝</span><span class="text-[10px] font-semibold mt-0.5">Bee</span></button>
+        <button data-preset="axolotl" class="preset-card flex flex-col items-center py-1.5 px-1 rounded-xl bg-slate-800/90 border border-slate-700/80 hover:bg-slate-800 transition text-xs"><span class="text-base">🦎</span><span class="text-[10px] font-semibold mt-0.5">Axolotl</span></button>
+        <button data-preset="caterpillar" class="preset-card flex flex-col items-center py-1.5 px-1 rounded-xl bg-slate-800/90 border border-slate-700/80 hover:bg-slate-800 transition text-xs"><span class="text-base">🐛</span><span class="text-[10px] font-semibold mt-0.5">Bug</span></button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3.5">
+
+      <section class="bg-slate-800/50 p-3 rounded-2xl border border-emerald-500/35 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">0. Printer &amp; Colour Workflow</h2>
+          <span id="badgeWorkflow" class="text-[10px] font-semibold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-full">AMS / U1 4-Slot</span>
+        </div>
+        <div>
+          <label class="text-[11px] font-medium text-slate-300 block mb-1">Build Plate</label>
+          <div class="grid grid-cols-4 gap-1.5" id="printerGroup">
+            <button data-printer="a1mini" class="printer-btn text-[11px] py-1.5 px-1 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center"><span class="font-bold">A1 mini</span><span class="text-[9px] opacity-75">180 mm</span></button>
+            <button data-printer="x1c" class="printer-btn active text-[11px] py-1.5 px-1 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center"><span class="font-bold">X1/P1/A1</span><span class="text-[9px] opacity-75">256 mm</span></button>
+            <button data-printer="u1" class="printer-btn text-[11px] py-1.5 px-1 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center"><span class="font-bold">Snapmaker U1</span><span class="text-[9px] opacity-75">270 mm</span></button>
+            <button data-printer="generic" class="printer-btn text-[11px] py-1.5 px-1 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center"><span class="font-bold">Other</span><span class="text-[9px] opacity-75">220 mm</span></button>
+          </div>
+          <p id="printerNote" class="text-[10px] text-slate-400 mt-1 leading-snug"></p>
+        </div>
+        <div>
+          <label class="text-[11px] font-medium text-slate-300 block mb-1">Colour Workflow</label>
+          <div class="grid grid-cols-2 gap-1.5" id="colorModeGroup">
+            <button data-cmode="ams" class="mode-btn active text-[10px] py-1.5 px-2 rounded-xl bg-slate-900 border border-slate-700 text-left flex flex-col"><span class="font-bold">🎨 AMS / U1 4-Tool</span><span class="text-[9px] opacity-75">One print, slots 1–4</span></button>
+            <button data-cmode="kit" class="mode-btn text-[10px] py-1.5 px-2 rounded-xl bg-slate-900 border border-slate-700 text-left flex flex-col"><span class="font-bold">🧩 Press-Fit Kit</span><span class="text-[9px] opacity-75">Pegs + separate eye/horn pieces</span></button>
+            <button data-cmode="single" class="mode-btn text-[10px] py-1.5 px-2 rounded-xl bg-slate-900 border border-slate-700 text-left flex flex-col"><span class="font-bold">🗿 One Spool</span><span class="text-[9px] opacity-75">Raised relief details</span></button>
+            <button data-cmode="layer" class="mode-btn text-[10px] py-1.5 px-2 rounded-xl bg-slate-900 border border-slate-700 text-left flex flex-col"><span class="font-bold">⏸️ M600 Colour Change</span><span class="text-[9px] opacity-75">Swap filament at a height</span></button>
+          </div>
+        </div>
+        <p id="modeHelperText" class="text-[11px] text-slate-300 bg-slate-900/90 p-2 rounded-xl border border-slate-700/80 leading-relaxed"></p>
+        <div class="grid grid-cols-2 gap-1.5 pt-1">
+          <div class="flex items-center justify-between bg-slate-900 px-2 py-1.5 rounded-xl border border-slate-700">
+            <label class="flex items-center gap-2 cursor-pointer"><input type="color" id="colPrimary" value="#10b981" class="w-5 h-5 rounded cursor-pointer"><span class="leading-tight"><span class="text-[9px] text-slate-400 font-bold block">SLOT 1</span><span class="text-[10px] font-bold text-white">Body</span></span></label>
+            <button data-slot="1" class="slot-export-btn text-[10px] bg-slate-800 hover:bg-emerald-500 hover:text-slate-950 text-slate-300 font-bold px-1.5 py-0.5 rounded transition">.STL</button>
+          </div>
+          <div class="flex items-center justify-between bg-slate-900 px-2 py-1.5 rounded-xl border border-slate-700">
+            <label class="flex items-center gap-2 cursor-pointer"><input type="color" id="colSecondary" value="#fbbf24" class="w-5 h-5 rounded cursor-pointer"><span class="leading-tight"><span class="text-[9px] text-slate-400 font-bold block">SLOT 2</span><span class="text-[10px] font-bold text-white">Accents</span></span></label>
+            <button data-slot="2" class="slot-export-btn text-[10px] bg-slate-800 hover:bg-emerald-500 hover:text-slate-950 text-slate-300 font-bold px-1.5 py-0.5 rounded transition">.STL</button>
+          </div>
+          <div class="flex items-center justify-between bg-slate-900 px-2 py-1.5 rounded-xl border border-slate-700">
+            <label class="flex items-center gap-2 cursor-pointer"><input type="color" id="colEyes" value="#0f172a" class="w-5 h-5 rounded cursor-pointer"><span class="leading-tight"><span class="text-[9px] text-slate-400 font-bold block">SLOT 3</span><span class="text-[10px] font-bold text-white">Eyes</span></span></label>
+            <button data-slot="3" class="slot-export-btn text-[10px] bg-slate-800 hover:bg-emerald-500 hover:text-slate-950 text-slate-300 font-bold px-1.5 py-0.5 rounded transition">.STL</button>
+          </div>
+          <div class="flex items-center justify-between bg-slate-900 px-2 py-1.5 rounded-xl border border-slate-700">
+            <label class="flex items-center gap-2 cursor-pointer"><input type="color" id="colJoint" value="#f59e0b" class="w-5 h-5 rounded cursor-pointer"><span class="leading-tight"><span class="text-[9px] text-slate-400 font-bold block">SLOT 4</span><span class="text-[10px] font-bold text-white">Hinge knobs</span></span></label>
+            <button data-slot="4" class="slot-export-btn text-[10px] bg-slate-800 hover:bg-emerald-500 hover:text-slate-950 text-slate-300 font-bold px-1.5 py-0.5 rounded transition">.STL</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="bg-emerald-950/30 p-3 rounded-2xl border border-emerald-500/40 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">1. Print-in-Place Hinges</h2>
+          <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold">45° · no supports</span>
+        </div>
+        <div>
+          <label class="text-[11px] font-medium text-slate-300 block mb-1">Hinge Type</label>
+          <div class="grid grid-cols-3 gap-1.5" id="jointTypeGroup">
+            <button data-jtype="chain" class="joint-btn active text-[10px] py-1.5 px-1 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center"><span class="font-bold">Barrel Knob</span><span class="text-[8px] opacity-75">±22° · one lip</span></button>
+            <button data-jtype="double" class="joint-btn text-[10px] py-1.5 px-1 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center"><span class="font-bold">Twin-Lip</span><span class="text-[8px] opacity-75">±22° · two lips where tall enough</span></button>
+            <button data-jtype="ball" class="joint-btn text-[10px] py-1.5 px-1 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center"><span class="font-bold">Wide Swing</span><span class="text-[8px] opacity-75">±32° · bigger knob</span></button>
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1"><label for="rngJointBeef" class="text-slate-300 font-medium">Knob Size</label><span id="lblJointBeef" class="font-bold text-emerald-400 font-mono">1.35×</span></div>
+          <input id="rngJointBeef" type="range" min="1.0" max="1.7" step="0.05" value="1.35" class="w-full cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1"><label for="rngInterlock" class="text-slate-300 font-medium">Segment Spacing</label><span id="lblInterlock" class="font-bold text-emerald-400 font-mono">1.50</span></div>
+          <input id="rngInterlock" type="range" min="1.35" max="1.80" step="0.05" value="1.50" class="w-full cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1"><label for="rngClearance" class="text-slate-300 font-medium">Air Gap (clearance)</label><span id="lblClearance" class="font-bold text-amber-300 font-mono">0.35 mm</span></div>
+          <input id="rngClearance" type="range" min="0.20" max="0.55" step="0.05" value="0.35" class="w-full cursor-pointer">
+          <p class="text-[10px] text-slate-400 mt-1">0.30–0.40 mm suits well-tuned Bambu and U1 printers; use 0.45+ for older or bowden machines.</p>
+        </div>
+        <div class="flex items-center justify-between pt-1 border-t border-emerald-500/20 text-[11px]">
+          <label class="flex items-center gap-1.5 cursor-pointer text-slate-300"><input type="checkbox" id="chkCutawayBox" class="accent-emerald-400 w-3.5 h-3.5 rounded"><span>Slice through joints</span></label>
+          <label class="flex items-center gap-1.5 cursor-pointer text-slate-300"><input type="checkbox" id="chkXray" class="accent-emerald-400 w-3.5 h-3.5 rounded"><span>X-ray body</span></label>
+        </div>
+      </section>
+
+      <section class="bg-slate-800/50 p-3 rounded-2xl border border-slate-700/60 space-y-2">
+        <h2 class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">2. Head &amp; Expression</h2>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label for="selHead" class="text-[11px] font-medium text-slate-300 block mb-1">Head Style</label>
+            <select id="selHead" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white outline-none">
+              <option value="dragon">🐲 Dragon Horns &amp; Snout</option>
+              <option value="cat">🐱 Pointy Cat Ears</option>
+              <option value="bunny">🐰 Bunny Ears</option>
+              <option value="trex">🦖 T-Rex Snout &amp; Crest</option>
+              <option value="narwhal">🦄 Narwhal Tusk</option>
+              <option value="bee">🐝 Cute Antennae</option>
+              <option value="axolotl">🦎 Axolotl Gills</option>
+            </select>
+          </div>
+          <div>
+            <label for="selEyes" class="text-[11px] font-medium text-slate-300 block mb-1">Eye Expression</label>
+            <select id="selEyes" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white outline-none">
+              <option value="kawaii">✨ Kawaii Glossy</option>
+              <option value="happy">😊 Happy Arcs</option>
+              <option value="angry">😠 Fierce Brow</option>
+              <option value="sleepy">😴 Sleepy Lids</option>
+              <option value="cyclops">👁️ Cyclops</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="bg-slate-800/50 p-3 rounded-2xl border border-slate-700/60 space-y-2.5">
+        <h2 class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">3. Body &amp; Print Pose</h2>
+        <div>
+          <div class="flex justify-between text-xs mb-1"><label for="rngSegments" class="text-slate-300 font-medium">Body Segments</label><span id="lblSegments" class="font-bold text-emerald-400 font-mono">5</span></div>
+          <input id="rngSegments" type="range" min="2" max="10" value="5" class="w-full cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1"><label for="rngChubby" class="text-slate-300 font-medium">Chubbiness (width)</label><span id="lblChubby" class="font-bold text-emerald-400 font-mono">1.05×</span></div>
+          <input id="rngChubby" type="range" min="0.75" max="1.45" step="0.05" value="1.05" class="w-full cursor-pointer">
+        </div>
+        <div>
+          <label class="text-[11px] font-medium text-slate-300 block mb-1">Pose on the Bed</label>
+          <div class="grid grid-cols-3 gap-1.5" id="poseGroup">
+            <button data-pose="straight" class="pose-btn active text-xs py-1.5 rounded-xl bg-slate-900 border border-slate-700 transition">📏 Straight</button>
+            <button data-pose="scurve" class="pose-btn text-xs py-1.5 rounded-xl bg-slate-900 border border-slate-700 transition">〰️ S-Curve</button>
+            <button data-pose="spiral" class="pose-btn text-xs py-1.5 rounded-xl bg-slate-900 border border-slate-700 transition">🌀 Curled</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="bg-slate-800/50 p-3 rounded-2xl border border-slate-700/60 space-y-2">
+        <h2 class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">4. Limbs, Wings &amp; Tail</h2>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label for="selLegs" class="text-[11px] font-medium text-slate-300 block mb-1">Feet</label>
+            <select id="selLegs" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white outline-none">
+              <option value="claws">🦖 Dino Stompers</option>
+              <option value="paws">🐾 Cute Paws</option>
+              <option value="flippers">🌊 Flippers</option>
+              <option value="none">🐍 No Feet</option>
+            </select>
+          </div>
+          <div>
+            <label for="selWings" class="text-[11px] font-medium text-slate-300 block mb-1">Back Feature</label>
+            <select id="selWings" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white outline-none">
+              <option value="bat">🦇 Dragon Wings</option>
+              <option value="bee">🐝 Fairy Wings</option>
+              <option value="spikes">⚡ Spine Spikes</option>
+              <option value="none">✨ Smooth Back</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label for="selTail" class="text-[11px] font-medium text-slate-300 block mb-1">Tail</label>
+          <select id="selTail" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white outline-none">
+            <option value="spade">🐉 Dragon Spade</option>
+            <option value="cat">🐈 Curled Cat Tail</option>
+            <option value="puff">🐇 Fluffy Puff</option>
+            <option value="fluke">🐋 Whale Fluke</option>
+            <option value="stinger">🐝 Stinger</option>
+          </select>
+        </div>
+        <div class="pt-1 border-t border-slate-700/60 space-y-1">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Moving parts</span>
+          <label class="flex items-center justify-between gap-2 text-xs cursor-pointer py-0.5">
+            <span class="text-slate-300">🪽 Hinged wings: lie flat, flap up past vertical</span>
+            <input type="checkbox" id="chkHingedWings" class="accent-emerald-400 w-4 h-4 rounded cursor-pointer">
+          </label>
+          <label class="flex items-center justify-between gap-2 text-xs cursor-pointer py-0.5">
+            <span class="text-slate-300">🌊 Hinged flippers: paddle up and down</span>
+            <input type="checkbox" id="chkHingedFlippers" class="accent-emerald-400 w-4 h-4 rounded cursor-pointer">
+          </label>
+          <p id="movingHint" class="text-[10px] text-slate-400 leading-snug">Each moving part prints in place on a cone-pin hinge beside the body: no supports, no assembly.</p>
+        </div>
+      </section>
+
+      <section class="bg-slate-800/50 p-3 rounded-2xl border border-slate-700/60 space-y-2">
+        <h2 class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">5. Hardware</h2>
+        <label class="flex items-center justify-between text-xs cursor-pointer py-1">
+          <span class="text-slate-300">🔗 Keychain loop at the nose (4.5 mm hole)</span>
+          <input type="checkbox" id="chkKeychain" class="accent-emerald-400 w-4 h-4 rounded cursor-pointer">
+        </label>
+        <label class="flex items-center justify-between text-xs cursor-pointer py-1">
+          <span class="text-slate-300">🧲 6×2 mm magnet wells underneath</span>
+          <input type="checkbox" id="chkMagnets" checked class="accent-emerald-400 w-4 h-4 rounded cursor-pointer">
+        </label>
+      </section>
+
+      <section class="bg-slate-800/50 p-3 rounded-2xl border border-sky-500/35 space-y-2">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-extrabold uppercase tracking-wider text-sky-400">6. Snap-On Add-Ons</h2>
+          <span class="text-[10px] bg-sky-500/20 text-sky-300 px-1.5 py-0.5 rounded font-bold">print later · click on</span>
+        </div>
+        <label class="flex items-center justify-between text-xs cursor-pointer py-0.5">
+          <span class="text-slate-300">🔌 Accessory port on the back (segment 1)</span>
+          <input type="checkbox" id="chkPort" checked class="accent-sky-400 w-4 h-4 rounded cursor-pointer">
+        </label>
+        <label class="flex items-center justify-between text-xs cursor-pointer py-0.5">
+          <span class="text-slate-300">🎩 Second port on the head (for hats)</span>
+          <input type="checkbox" id="chkHeadPort" class="accent-sky-400 w-4 h-4 rounded cursor-pointer">
+        </label>
+        <div>
+          <span class="text-[11px] font-medium text-slate-300 block mb-1">Add-on pack</span>
+          <div class="grid grid-cols-4 gap-1.5" id="addonGroup">
+            <label class="addon-chip text-[10px] py-1.5 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center cursor-pointer"><input type="checkbox" data-addon="wings" checked class="accent-sky-400 w-3.5 h-3.5"><span class="font-bold mt-0.5">🪽 Wings</span></label>
+            <label class="addon-chip text-[10px] py-1.5 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center cursor-pointer"><input type="checkbox" data-addon="fins" class="accent-sky-400 w-3.5 h-3.5"><span class="font-bold mt-0.5">🐟 Fins</span></label>
+            <label class="addon-chip text-[10px] py-1.5 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center cursor-pointer"><input type="checkbox" data-addon="hat" checked class="accent-sky-400 w-3.5 h-3.5"><span class="font-bold mt-0.5">🎩 Hat</span></label>
+            <label class="addon-chip text-[10px] py-1.5 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center cursor-pointer"><input type="checkbox" data-addon="saddle" checked class="accent-sky-400 w-3.5 h-3.5"><span class="font-bold mt-0.5">🐎 Saddle</span></label>
+          </div>
+        </div>
+        <div>
+          <label for="selPreviewAddon" class="text-[11px] font-medium text-slate-300 block mb-1">Clipped on in the preview</label>
+          <select id="selPreviewAddon" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white outline-none">
+            <option value="wings">🪽 Wings (fold down along the sides)</option>
+            <option value="fins">🐟 Fins</option>
+            <option value="hat">🎩 Top hat</option>
+            <option value="saddle">🐎 Saddle</option>
+            <option value="none">None (show the port)</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button id="btnPackView" class="bg-slate-900 hover:bg-slate-800 border border-sky-500/50 text-sky-300 text-[11px] font-bold px-2 py-1.5 rounded-xl transition">🧩 <span id="packViewText">Show pack plate</span></button>
+          <button id="btnExportAddons" class="bg-sky-500 hover:bg-sky-400 active:scale-95 text-slate-950 text-[11px] font-extrabold px-2 py-1.5 rounded-xl transition">⬇️ Add-on pack 3MF</button>
+        </div>
+        <p id="addonHint" class="text-[10px] text-slate-400 leading-snug"></p>
+      </section>
+
+      <section class="p-3 rounded-2xl border border-slate-700/60 text-[11px] text-slate-400 leading-relaxed space-y-1">
+        <h2 class="text-xs font-extrabold uppercase tracking-wider text-slate-300">How it prints</h2>
+        <p>Each segment is its own solid. A knob on the rear segment sits in a ring on the front one, with the air gap all round and 45° lips above and below, so it turns side to side but cannot lift or pull out. Every surface is vertical or at least 45°, and every body sits flat on the bed.</p>
+        <p>Links have fixed minimums on every design: a neck at least 3 mm wide (7 lines at 0.42 mm), a 2.6 mm socket wall, 0.9 mm lips, and a socket mouth at least 0.7 mm narrower than the knob.</p>
+        <p>Hinged wings and flippers use a horizontal hinge: two body knuckles with 45° cone pins hold the part's knuckle between them.</p>
+        <p>The accessory port is a blind hole with a 45° undercut. Add-ons print flat with a split peg pointing up; flip one over and push it in. The barb is wider than the mouth by the snap (0.3–0.5 mm, less on looser printers), clicks into the undercut and lets the add-on swivel. The fit gap is your printer's air gap.</p>
+        <p>The 3MF places the pet on your plate clear of keep-out zones and the prime tower, and switches brim and supports off for it. Pick your printer, filament and a 0.2 mm profile in the slicer, and print the first layer slowly.</p>
+      </section>
+    </div>
+  </aside>
+</div>
+
+<script id="manifold-wasm" type="application/octet-stream">__WASM_BASE64__</script>
+
+<script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
+  import Module from 'https://cdn.jsdelivr.net/npm/manifold-3d@3.4.1/manifold.js';
+
+/*__ENGINE__*/
+
+/*__PRINTERS__*/
+
+  // --- 1. STATE (scene: 1 unit = 10 mm, Y up; geometry: mm, Z up, plate origin front-left)
+  const GRID_COLOUR = { a1mini: 0x38bdf8, x1c: 0x10b981, u1: 0xf59e0b, generic: 0xa78bfa };
+  const state = {
+    printer: 'x1c', colorMode: 'ams', jointType: 'chain', jointBeef: 1.35, interlock: 1.50, clearance: 0.35,
+    head: 'dragon', eyes: 'angry', segments: 5, pose: 'straight', chubby: 1.05, legs: 'claws', wings: 'bat', tail: 'spade',
+    colPrimary: '#10b981', colSecondary: '#fbbf24', colEyes: '#0f172a', colJoint: '#f59e0b',
+    keychain: false, magnets: true, hingedWings: false, hingedFlippers: false, xray: false, cutaway: false, wiggle: false,
+    port: true, headPort: false, pack: ['wings', 'hat', 'saddle'], previewAddon: 'wings', view: 'pet',
+  };
+
+  const PRESETS = {
+    dragon:      { head: 'dragon',  eyes: 'angry',   segments: 5, chubby: 1.05, legs: 'claws',    wings: 'bat',    tail: 'spade',   colPrimary: '#10b981', colSecondary: '#fbbf24' },
+    cat:         { head: 'cat',     eyes: 'happy',   segments: 4, chubby: 1.05, legs: 'paws',     wings: 'none',   tail: 'cat',     colPrimary: '#fb923c', colSecondary: '#ffedd5' },
+    bunny:       { head: 'bunny',   eyes: 'kawaii',  segments: 3, chubby: 1.20, legs: 'paws',     wings: 'none',   tail: 'puff',    colPrimary: '#f472b6', colSecondary: '#fce7f3' },
+    trex:        { head: 'trex',    eyes: 'angry',   segments: 4, chubby: 1.15, legs: 'claws',    wings: 'spikes', tail: 'spade',   colPrimary: '#84cc16', colSecondary: '#facc15' },
+    narwhal:     { head: 'narwhal', eyes: 'sleepy',  segments: 5, chubby: 1.10, legs: 'flippers', wings: 'none',   tail: 'fluke',   colPrimary: '#38bdf8', colSecondary: '#fef08a' },
+    bee:         { head: 'bee',     eyes: 'kawaii',  segments: 3, chubby: 1.25, legs: 'paws',     wings: 'bee',    tail: 'stinger', colPrimary: '#facc15', colSecondary: '#38bdf8' },
+    axolotl:     { head: 'axolotl', eyes: 'kawaii',  segments: 5, chubby: 1.00, legs: 'paws',     wings: 'spikes', tail: 'fluke',   colPrimary: '#f9a8d4', colSecondary: '#ec4899' },
+    caterpillar: { head: 'bee',     eyes: 'cyclops', segments: 8, chubby: 0.95, legs: 'paws',     wings: 'none',   tail: 'puff',    colPrimary: '#a3e635', colSecondary: '#22c55e' },
+  };
+
+  const $ = id => document.getElementById(id);
+  const spec = () => PRINTER_SPECS[state.printer];
+  let toastTimer = null;
+  function showToast(msg, icon = '✅') {
+    $('toastMsg').textContent = msg; $('toastIcon').textContent = icon;
+    const el = $('toast'); el.classList.remove('opacity-0'); el.classList.add('opacity-100');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.classList.remove('opacity-100'); el.classList.add('opacity-0'); }, 2800);
+  }
+
+  // --- 2. VIEWPORT
+  const container = $('canvasContainer');
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, container.clientWidth / Math.max(1, container.clientHeight), 0.1, 1000);
+  camera.position.set(11, 9, 13);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.localClippingEnabled = true;
+  container.appendChild(renderer.domElement);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.06; controls.target.set(0, 0.8, 0);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.45);
+  sun.position.set(14, 26, 18); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { near: 0.5, far: 60, left: -15, right: 15, top: 15, bottom: -15 });
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0x38bdf8, 0.5); fill.position.set(-16, 10, -14); scene.add(fill);
+  const bounce = new THREE.DirectionalLight(0x10b981, 0.45); bounce.position.set(0, -15, 0); scene.add(bounce);
+
+  // plate coordinates (mm, origin front-left) -> scene
+  const plateToScene = (x, y) => { const [W, H] = spec().bed; return [(x - W / 2) * 0.1, -(y - H / 2) * 0.1]; };
+  const plateGroup = new THREE.Group(); scene.add(plateGroup);
+  function buildPrinterBed() {
+    plateGroup.clear();
+    const sp = spec(), [W, H] = sp.bed, u = W / 10, v = H / 10, col = GRID_COLOUR[state.printer];
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(u, 0.24, v), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.55, metalness: 0.25, transparent: true, opacity: 0.72 }));
+    plate.position.y = -0.12; plate.receiveShadow = true; plateGroup.add(plate);
+    const grid = new THREE.GridHelper(u, Math.round(W / 10), col, 0x334155); grid.position.y = 0.01; plateGroup.add(grid);
+    const border = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(u + 0.15, 0.26, v + 0.15)), new THREE.LineBasicMaterial({ color: col }));
+    border.position.y = -0.12; plateGroup.add(border);
+    // keep-out zones (red) and the prime tower area (amber) that the layout avoids
+    const ap = activePlacement();
+    const zones = (ap && ap.keep) || sp.keepOut;
+    zones.forEach((r, k) => {
+      const isTower = k >= sp.keepOut.length;
+      const m = new THREE.Mesh(new THREE.BoxGeometry((r[2] - r[0]) * 0.1, 0.03, (r[3] - r[1]) * 0.1),
+        new THREE.MeshBasicMaterial({ color: isTower ? 0xf59e0b : 0xef4444, transparent: true, opacity: 0.35 }));
+      const [x, z] = plateToScene((r[0] + r[2]) / 2, (r[1] + r[3]) / 2);
+      m.position.set(x, 0.03, z); plateGroup.add(m);
+    });
+    if (state.printer === 'u1') {
+      const cols = [state.colPrimary, state.colSecondary, state.colEyes, state.colJoint];
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(u * 0.85, 0.4, 0.6), new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 }));
+      bar.position.set(0, 3.8, -v / 2 - 1.2); plateGroup.add(bar);
+      for (let t = 0; t < 4; t++) {
+        const g = new THREE.Group();
+        g.add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.1, 1.4), new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.3 })));
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.4, 16), new THREE.MeshStandardMaterial({ color: cols[t], roughness: 0.2 }));
+        ring.position.y = 1.25; g.add(ring);
+        const nz = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.6, 12), new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.7, roughness: 0.2 }));
+        nz.rotation.x = Math.PI; nz.position.y = -1.35; g.add(nz);
+        g.position.set((t - 1.5) * 3.6, 3.8, -v / 2 - 0.6); plateGroup.add(g);
+      }
+    }
+  }
+
+  // pet geometry lives in mm, Z up; petRoot maps it into the Y-up, 1 unit = 10 mm scene and
+  // placeGroup puts it where the exported 3MF will put it on this printer's plate
+  const petRoot = new THREE.Group();
+  petRoot.rotation.x = -Math.PI / 2; petRoot.scale.setScalar(0.1);
+  scene.add(petRoot);
+  const placeGroup = new THREE.Group(); petRoot.add(placeGroup);
+
+  // --- 3. ENGINE
+  let engine = null, model = null, buildTimer = null, building = false, pending = false;
+  async function loadEngine() {
+    const b64 = $('manifold-wasm').textContent.trim();
+    let opts = {};
+    if (b64 && !b64.startsWith('__')) {
+      const bin = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+      opts = { wasmBinary: bin.buffer };
+    }
+    const wasm = await Module(opts);
+    wasm.setup();
+    engine = createFlexiEngine(wasm);
+  }
+
+  const params = () => ({
+    segments: state.segments, chubby: state.chubby, interlock: state.interlock, clearance: state.clearance,
+    jointBeef: state.jointBeef, jointType: state.jointType, head: state.head, eyes: state.eyes, legs: state.legs,
+    wings: state.wings, tail: state.tail, pose: state.pose, colorMode: state.colorMode, keychain: state.keychain,
+    magnets: state.magnets, hingedWings: state.hingedWings, hingedFlippers: state.hingedFlippers,
+    // snap-on add-ons: the fit (and from it the snap) comes from the printer table
+    port: state.port, headPort: state.headPort, fit: spec().clearance, pack: state.pack,
+    addons: [...new Set([...state.pack, ...(state.previewAddon === 'none' ? [] : [state.previewAddon])])],
+  });
+
+  function scheduleBuild(delay = 120) {
+    clearTimeout(buildTimer);
+    $('statBuild').textContent = 'rebuilding…';
+    buildTimer = setTimeout(runBuild, delay);
+  }
+  function placeModel() {
+    if (!model) return;
+    model.placement = placeOnPlate(model.footprint, spec(), state.colorMode === 'ams');
+    model.packPlacement = model.pack ? placeOnPlate(model.pack.footprint, spec(), state.colorMode === 'ams') : null;
+  }
+  const activePlacement = () => model && (state.view === 'pack' ? model.packPlacement : model.placement);
+  function runBuild() {
+    if (!engine) return;
+    if (building) { pending = true; return; }
+    building = true;
+    try {
+      const t0 = performance.now();
+      const res = engine.build(params());
+      const J0 = res.joints[0];
+      const cutZ = J0 ? J0.zb + J0.e + J0.wb / 2 : 4;
+      const meshOf = m => engine.toMesh(m);
+      const cutOf = m => { const c = m.trimByPlane([0, 0, -1], -cutZ); return c.isEmpty() ? null : engine.toMesh(c); };
+      const meshes = parts => Object.fromEntries(Object.entries(parts).map(([s, m]) => [s, meshOf(m)]));
+      const cuts = parts => state.cutaway ? Object.fromEntries(Object.entries(parts).map(([s, m]) => [s, cutOf(m)]).filter(e => e[1])) : null;
+      model = {
+        bodies: res.bodies.map(b => ({
+          index: b.index, pos: b.pos.slice(), th: b.th, parts: meshes(b.parts), cut: cuts(b.parts),
+          flaps: b.flaps.map(fl => ({ side: fl.side, kind: fl.kind, axisP: fl.axisP, axisD: fl.axisD, parts: meshes(fl.parts), cut: cuts(fl.parts) })),
+        })),
+        kit: res.kit.map(k => ({ name: k.name, slot: k.slot, mesh: meshOf(k.m), cut: state.cutaway ? cutOf(k.m) : null })),
+        addons: res.addons.map(a => ({
+          key: a.key, name: a.name, where: a.where, seg: a.seg, attach: a.attach, packOffset: a.packOffset, parts: meshes(a.parts),
+          flaps: a.flaps.map(fl => ({ side: fl.side, axisP: fl.axisP, axisD: fl.axisD, parts: meshes(fl.parts) })),
+        })),
+        pack: res.pack && { footprint: res.pack.footprint, size: res.pack.size },
+        ports: res.bodies.filter(b => b.port).map(b => ({ where: b.port.where, ok: b.port.ok, why: b.port.why, r0: b.port.k.r0, snap: b.port.k.i, fit: b.port.k.fit })),
+        plan: res.plan, joints: res.joints.map(J => ({ ...J })), size: res.size, layerChangeZ: res.layerChangeZ,
+        neckArea: res.neckArea, minCapture: res.minCapture, swing: res.swing, footprint: res.footprint, cutZ, ms: performance.now() - t0,
+      };
+      model.packAddons = model.addons.filter(a => a.packOffset && state.pack.includes(a.key));
+      engine.free();
+      placeModel();
+      buildPrinterBed();
+      showModel();
+      updateTelemetry();
+    } catch (err) {
+      console.error(err);
+      engine.free();
+      showToast('Could not build this combination: ' + (err.message || err), '⚠️');
+    } finally {
+      building = false;
+      if (pending) { pending = false; scheduleBuild(0); }
+    }
+  }
+
+  // --- 4. PREVIEW
+  function slotColour(slot) {
+    if (state.colorMode === 'single' || state.colorMode === 'layer') return state.colPrimary;
+    if (state.colorMode === 'kit') return slot === 3 ? state.colEyes : slot === 2 ? state.colSecondary : state.colPrimary;
+    return { 1: state.colPrimary, 2: state.colSecondary, 3: state.colEyes, 4: state.colJoint }[slot];
+  }
+  function toGeometry(mesh) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
+    g.setIndex(new THREE.BufferAttribute(mesh.indices, 1));
+    return toCreasedNormals(g, 0.6);
+  }
+  function material(colour, slot, clip) {
+    const ghost = state.xray && slot === 1;
+    const m = new THREE.MeshStandardMaterial({
+      color: colour, roughness: slot === 3 ? 0.15 : 0.36, metalness: 0.06,
+      transparent: ghost, opacity: ghost ? 0.3 : 1, depthWrite: !ghost, side: THREE.DoubleSide,
+    });
+    if (clip) m.clippingPlanes = [clip];
+    return m;
+  }
+  function addMesh(group, mesh, slot, colourOverride) {
+    const geo = toGeometry(mesh);
+    if (state.colorMode === 'layer' && !colourOverride) {
+      // preview the filament swap: bottom colour below the change height, top colour above it
+      const h = model.layerChangeZ * 0.1;
+      const lower = new THREE.Mesh(geo, material(state.colPrimary, slot, new THREE.Plane(new THREE.Vector3(0, -1, 0), h)));
+      const upper = new THREE.Mesh(geo, material(state.colSecondary, slot, new THREE.Plane(new THREE.Vector3(0, 1, 0), -h)));
+      for (const m of [lower, upper]) { m.castShadow = true; m.receiveShadow = true; group.add(m); }
+      return;
+    }
+    const m = new THREE.Mesh(geo, material(colourOverride || slotColour(+slot), +slot));
+    m.castShadow = true; m.receiveShadow = true;
+    group.add(m);
+  }
+  // an add-on in its print pose (flat side on the bed, peg up); hinged plates on pivots
+  function addAddon(parent, a) {
+    const g = new THREE.Group();
+    for (const [slot, mesh] of Object.entries(a.parts)) addMesh(g, mesh, slot, slotColour(+slot));
+    for (const fl of a.flaps) {
+      const pivot = new THREE.Group();
+      pivot.position.set(...fl.axisP);
+      pivot.userData.addonFlap = fl;
+      const inner = new THREE.Group(); inner.position.set(-fl.axisP[0], -fl.axisP[1], -fl.axisP[2]);
+      for (const [slot, mesh] of Object.entries(fl.parts)) addMesh(inner, mesh, slot, slotColour(+slot));
+      pivot.add(inner); g.add(pivot);
+    }
+    parent.add(g);
+    return g;
+  }
+  function showModel() {
+    placeGroup.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+    placeGroup.clear();
+    if (!model) return;
+    const pl = activePlacement(), [W, H] = spec().bed;
+    if (pl && pl.fits) { placeGroup.rotation.z = pl.angle * Math.PI / 180; placeGroup.position.set(pl.tx - W / 2, pl.ty - H / 2, 0); }
+    else { placeGroup.rotation.z = 0; placeGroup.position.set(0, 0, 0); }
+    if (state.view === 'pack') {
+      // the add-on pack as it will print: side by side, flat, pegs up
+      for (const a of model.packAddons) addAddon(placeGroup, a).position.set(a.packOffset[0], a.packOffset[1], 0);
+      setFlaps(0);
+      return;
+    }
+    for (const b of model.bodies) {
+      const g = new THREE.Group();
+      g.userData.index = b.index;
+      for (const [slot, mesh] of Object.entries(state.cutaway && b.cut ? b.cut : b.parts)) addMesh(g, mesh, slot);
+      // each hinged flap turns about its own axis inside its segment's group
+      for (const fl of b.flaps) {
+        const pivot = new THREE.Group();
+        pivot.position.set(...fl.axisP);
+        pivot.userData.flap = fl;
+        const inner = new THREE.Group(); inner.position.set(-fl.axisP[0], -fl.axisP[1], -fl.axisP[2]);
+        for (const [slot, mesh] of Object.entries(state.cutaway && fl.cut ? fl.cut : fl.parts)) addMesh(inner, mesh, slot);
+        pivot.add(inner); g.add(pivot);
+      }
+      placeGroup.add(g);
+    }
+    const kitG = new THREE.Group();
+    for (const k of model.kit) addMesh(kitG, state.cutaway && k.cut ? k.cut : k.mesh, k.slot, k.slot === 3 ? state.colEyes : state.colSecondary);
+    placeGroup.add(kitG);
+    // the chosen add-on flipped over and clicked into its port; it rides on that body
+    const a = state.previewAddon !== 'none' && model.addons.find(x => x.key === state.previewAddon);
+    const host = a && placeGroup.children.find(c => c.userData.index === a.seg);
+    if (host) { const g = addAddon(host, a); g.matrixAutoUpdate = false; g.matrix.fromArray(a.attach); }
+    resetPose();
+  }
+  const axisVec = new THREE.Vector3();
+  function setFlaps(angleDeg) {
+    placeGroup.traverse(o => {
+      const fl = o.userData && (o.userData.flap || o.userData.addonFlap);
+      // clipped-on add-on plates fold down along the body, which stops them at about 80 deg
+      const a = o.userData && o.userData.addonFlap && state.view === 'pet' ? Math.min(angleDeg, 78) : angleDeg;
+      if (fl) { axisVec.set(...fl.axisD); o.quaternion.setFromAxisAngle(axisVec, fl.side * a * Math.PI / 180); }
+    });
+  }
+  // move each body rigidly about its hinges (the same transforms the printed part allows)
+  function applyPose(delta) {
+    if (!model || state.view === 'pack') return;
+    const plan = model.plan;
+    const pose = engine.poseTransforms(plan, delta);
+    const sx = model.bodies[0].pos[0] - plan.segs[0].pos[0], sy = model.bodies[0].pos[1] - plan.segs[0].pos[1];
+    placeGroup.children.forEach((g, i) => {
+      if (i >= model.bodies.length) return;
+      const pp = [plan.segs[i].pos[0] + sx, plan.segs[i].pos[1] + sy];
+      const pt = [pose[i].pos[0] + sx, pose[i].pos[1] + sy];
+      const d = pose[i].th - plan.segs[i].th, c = Math.cos(d), s = Math.sin(d);
+      g.rotation.z = d;
+      g.position.set(pt[0] - (c * pp[0] - s * pp[1]), pt[1] - (s * pp[0] + c * pp[1]), 0);
+    });
+  }
+  function resetPose() { if (state.view === 'pet') placeGroup.children.forEach(g => { g.rotation.z = 0; g.position.set(0, 0, 0); }); setFlaps(0); }
+  // pet coordinates (mm) -> scene, through the plate placement
+  function petToScene(x, y, z = 0) {
+    const pl = model && model.placement, [W, H] = spec().bed;
+    if (pl && pl.fits) {
+      const a = pl.angle * Math.PI / 180;
+      const px = Math.cos(a) * x - Math.sin(a) * y + pl.tx, py = Math.sin(a) * x + Math.cos(a) * y + pl.ty;
+      const [sx, sz] = plateToScene(px, py); return [sx, z * 0.1, sz];
+    }
+    return [x * 0.1, z * 0.1, -y * 0.1];
+  }
+
+  // --- 5. TELEMETRY
+  function updateTelemetry() {
+    const sp = spec();
+    if (!model) { $('statPrinter').textContent = `${sp.name} · ${sp.bed[0]} mm`; return; }
+    const pl = activePlacement();
+    const fit = !pl || !pl.fits ? 'does not fit' : pl.angle ? `fits, turned ${pl.angle}°` : 'fits';
+    $('statPrinter').textContent = `${sp.name} · ${state.view === 'pack' ? 'add-on pack ' : ''}${fit}`;
+    const [L, W, H] = state.view === 'pack' && model.pack ? model.pack.size : model.size;
+    $('statSize').textContent = `${L.toFixed(0)} × ${W.toFixed(0)} × ${H.toFixed(0)} mm`;
+    const nFlaps = model.bodies.reduce((n, b) => n + b.flaps.length, 0);
+    $('statStrength').textContent = `${model.joints.length} × ±${model.swing}° · neck ≥ ${model.neckArea.toFixed(0)} mm² · lock ${model.minCapture.toFixed(1)} mm` + (nFlaps ? ` · ${nFlaps} flaps` : '');
+    $('statClearance').textContent = `${state.clearance.toFixed(2)} mm (45° lips ${(state.clearance * Math.SQRT2).toFixed(2)})`;
+    $('statBuild').textContent = `${model.bodies.length + nFlaps} moving parts · ${model.ms.toFixed(0)} ms`;
+    const warn = $('bedWarningBanner');
+    warn.hidden = !!(pl && pl.fits) && H <= sp.height;
+    $('warnLen').textContent = `${L.toFixed(0)} × ${W.toFixed(0)}`; $('warnBed').textContent = `${sp.bed[0]} × ${sp.bed[1]}`;
+    syncHelper();
+  }
+
+  // --- 6. UI SYNC
+  function syncHelper() {
+    const badge = $('badgeWorkflow'), helper = $('modeHelperText');
+    const z = model ? model.layerChangeZ.toFixed(1) : '–';
+    const text = {
+      ams: ['AMS / U1 4-Slot', '<strong>AMS / U1:</strong> one print, up to four filaments. In the 3MF every colour is its own part: slots 1–4 map to AMS slots or U1 toolheads T1–T4. Opens in Bambu Studio, OrcaSlicer and Snapmaker Orca. Tip: give slot 4 the body colour to cut tool changes.'],
+      kit: ['Press-Fit Kit', '<strong>Press-fit kit (no AMS):</strong> the pet prints in one colour with small pegs where the eyes and horns go. The pieces print beside it with matching holes (0.15 mm press fit): print them in a second colour, then press them on.'],
+      single: ['One Spool', '<strong>One spool:</strong> every detail becomes raised relief (eye rings, stripes) so it reads in a single filament.'],
+      layer: ['M600 Swap', `<strong>Colour change at ${z} mm:</strong> the 3MF tells your slicer to insert its filament-change G-code (M600 on most single-extruder printers) at that layer. Bottom colour = slot 1, top = slot 2.`],
+    }[state.colorMode];
+    badge.textContent = text[0];
+    helper.innerHTML = text[1];
+    $('printerNote').textContent = spec().note;
+    const fl = [];
+    if (state.hingedWings && !(state.wings === 'bat' || state.wings === 'bee')) fl.push('Pick Dragon or Fairy wings to hinge them.');
+    if (state.hingedFlippers && state.legs !== 'flippers') fl.push('Pick Flippers as feet to hinge them.');
+    $('movingHint').textContent = fl.length ? fl.join(' ') : 'Each moving part prints in place on a cone-pin hinge beside the body: no supports, no assembly.';
+    let ah;
+    if (!state.port && !state.headPort) ah = 'Turn a port on and new pets get a socket that add-ons click into. Pets printed without one cannot take add-ons.';
+    else if (!model) ah = '';
+    else {
+      const ok = model.ports.filter(p => p.ok), bad = model.ports.filter(p => !p.ok);
+      const k = ok[0];
+      ah = (k ? `Port: ${(2 * k.r0).toFixed(2)} mm mouth, snap ${k.snap.toFixed(2)} mm, ${k.fit.toFixed(2)} mm fit (${spec().name}). ` : '') +
+        bad.map(p => `No ${p.where} port on this design: ${p.why}. `).join('') +
+        (model.packAddons.length ? `Pack: ${model.packAddons.map(a => a.name.toLowerCase()).join(', ')}. Print it on the same printer, flip each piece and push it in until it clicks; it swivels on the peg.` : 'Pick add-ons for the pack.');
+    }
+    $('addonHint').textContent = ah;
+  }
+  function syncUI() {
+    $('selHead').value = state.head; $('selEyes').value = state.eyes;
+    $('rngSegments').value = state.segments; $('lblSegments').textContent = state.segments;
+    $('rngChubby').value = state.chubby; $('lblChubby').textContent = `${state.chubby.toFixed(2)}×`;
+    $('rngJointBeef').value = state.jointBeef; $('lblJointBeef').textContent = `${state.jointBeef.toFixed(2)}×`;
+    $('rngInterlock').value = state.interlock; $('lblInterlock').textContent = state.interlock.toFixed(2);
+    $('rngClearance').value = state.clearance; $('lblClearance').textContent = `${state.clearance.toFixed(2)} mm`;
+    $('selLegs').value = state.legs; $('selWings').value = state.wings; $('selTail').value = state.tail;
+    $('colPrimary').value = state.colPrimary; $('colSecondary').value = state.colSecondary;
+    $('colEyes').value = state.colEyes; $('colJoint').value = state.colJoint;
+    $('chkKeychain').checked = state.keychain; $('chkMagnets').checked = state.magnets;
+    $('chkHingedWings').checked = state.hingedWings; $('chkHingedFlippers').checked = state.hingedFlippers;
+    $('chkXray').checked = state.xray; $('chkCutawayBox').checked = state.cutaway;
+    $('chkPort').checked = state.port; $('chkHeadPort').checked = state.headPort;
+    document.querySelectorAll('#addonGroup input').forEach(c => { c.checked = state.pack.includes(c.dataset.addon); });
+    $('selPreviewAddon').value = state.previewAddon;
+    $('packViewText').textContent = state.view === 'pack' ? 'Back to the pet' : 'Show pack plate';
+    $('cutawayText').textContent = state.cutaway ? 'Close Slice View' : 'Slice Through Joints';
+    const act = (sel, key, attr) => document.querySelectorAll(sel).forEach(b => b.classList.toggle('active', b.dataset[attr] === state[key]));
+    act('#poseGroup button', 'pose', 'pose'); act('#printerGroup button', 'printer', 'printer');
+    act('#colorModeGroup button', 'colorMode', 'cmode'); act('#jointTypeGroup button', 'jointType', 'jtype');
+    syncHelper();
+  }
+
+  // --- 7. EVENTS (geometry changes rebuild; colour/view changes only repaint)
+  const rebuildOn = (id, ev, fn) => $(id).addEventListener(ev, e => { fn(e); syncUI(); scheduleBuild(); });
+  const repaintOn = (id, ev, fn) => $(id).addEventListener(ev, e => { fn(e); syncUI(); buildPrinterBed(); showModel(); });
+
+  document.querySelectorAll('#printerGroup button').forEach(btn => btn.addEventListener('click', () => {
+    state.printer = btn.dataset.printer;
+    const rec = spec().clearance, changed = Math.abs(state.clearance - rec) > 1e-6;
+    state.clearance = rec;
+    syncUI();
+    if (changed) { scheduleBuild(0); showToast(`${spec().name}: air gap set to ${rec.toFixed(2)} mm`); }
+    else { placeModel(); buildPrinterBed(); showModel(); updateTelemetry(); showToast(`Plate: ${spec().name}`); }
+  }));
+  document.querySelectorAll('#jointTypeGroup button').forEach(btn => btn.addEventListener('click', () => { state.jointType = btn.dataset.jtype; syncUI(); scheduleBuild(); }));
+  document.querySelectorAll('#colorModeGroup button').forEach(btn => btn.addEventListener('click', () => { state.colorMode = btn.dataset.cmode; syncUI(); scheduleBuild(); }));
+  document.querySelectorAll('#poseGroup button').forEach(btn => btn.addEventListener('click', () => { state.pose = btn.dataset.pose; syncUI(); scheduleBuild(); }));
+  rebuildOn('rngJointBeef', 'input', e => { state.jointBeef = parseFloat(e.target.value); });
+  rebuildOn('rngInterlock', 'input', e => { state.interlock = parseFloat(e.target.value); });
+  rebuildOn('rngClearance', 'input', e => { state.clearance = parseFloat(e.target.value); });
+  rebuildOn('rngSegments', 'input', e => { state.segments = parseInt(e.target.value, 10); });
+  rebuildOn('rngChubby', 'input', e => { state.chubby = parseFloat(e.target.value); });
+  for (const id of ['selHead', 'selEyes', 'selLegs', 'selWings', 'selTail']) {
+    rebuildOn(id, 'change', e => { state[id.replace('sel', '').toLowerCase()] = e.target.value; $('activePresetTag').textContent = 'Custom'; });
+  }
+  rebuildOn('chkKeychain', 'change', e => { state.keychain = e.target.checked; });
+  rebuildOn('chkMagnets', 'change', e => { state.magnets = e.target.checked; });
+  rebuildOn('chkHingedWings', 'change', e => {
+    state.hingedWings = e.target.checked;
+    if (state.hingedWings && !(state.wings === 'bat' || state.wings === 'bee')) state.wings = 'bat';
+  });
+  rebuildOn('chkHingedFlippers', 'change', e => {
+    state.hingedFlippers = e.target.checked;
+    if (state.hingedFlippers && state.legs !== 'flippers') state.legs = 'flippers';
+  });
+  for (const id of ['colPrimary', 'colSecondary', 'colEyes', 'colJoint']) repaintOn(id, 'input', e => { state[id] = e.target.value; });
+  rebuildOn('chkPort', 'change', e => { state.port = e.target.checked; });
+  rebuildOn('chkHeadPort', 'change', e => { state.headPort = e.target.checked; });
+  document.querySelectorAll('#addonGroup input').forEach(c => c.addEventListener('change', () => {
+    state.pack = [...document.querySelectorAll('#addonGroup input')].filter(x => x.checked).map(x => x.dataset.addon);
+    syncUI(); scheduleBuild();
+  }));
+  rebuildOn('selPreviewAddon', 'change', e => { state.previewAddon = e.target.value; });
+  $('btnPackView').addEventListener('click', () => {
+    state.view = state.view === 'pack' ? 'pet' : 'pack';
+    if (state.view === 'pack' && (!model || !model.packAddons.length)) { state.view = 'pet'; showToast('Turn a port on and pick at least one add-on', '⚠️'); }
+    syncUI(); buildPrinterBed(); showModel(); updateTelemetry();
+  });
+  repaintOn('chkXray', 'change', e => { state.xray = e.target.checked; });
+  const toggleCut = v => { state.cutaway = v; syncUI(); scheduleBuild(0); };
+  $('chkCutawayBox').addEventListener('change', e => toggleCut(e.target.checked));
+  $('btnCutaway').addEventListener('click', () => { toggleCut(!state.cutaway); showToast(state.cutaway ? 'Sliced at the knob bulge: knob, ring and gap' : 'Full bodies restored'); });
+  $('btnAutoFit').addEventListener('click', () => {
+    state.pose = 'spiral';
+    if (model && model.size[0] > spec().bed[0] * 1.15 && state.segments > 6) state.segments -= 2;
+    syncUI(); scheduleBuild(0); showToast('Curled the pet to fit the plate');
+  });
+  document.querySelectorAll('#presetBar button').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('#presetBar button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    Object.assign(state, PRESETS[btn.dataset.preset]);
+    $('activePresetTag').textContent = btn.dataset.preset;
+    syncUI(); scheduleBuild(0);
+  }));
+  $('btnRandom').addEventListener('click', () => {
+    const pick = a => a[Math.floor(Math.random() * a.length)];
+    const hex = () => '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+    Object.assign(state, {
+      head: pick(['dragon', 'cat', 'bunny', 'trex', 'narwhal', 'bee', 'axolotl']), eyes: pick(['kawaii', 'happy', 'angry', 'sleepy', 'cyclops']),
+      segments: 3 + Math.floor(Math.random() * 5), chubby: +(0.85 + Math.random() * 0.45).toFixed(2),
+      legs: pick(['claws', 'paws', 'flippers', 'none']), wings: pick(['bat', 'bee', 'spikes', 'none']),
+      tail: pick(['spade', 'cat', 'puff', 'fluke', 'stinger']), colPrimary: hex(), colSecondary: hex(),
+      hingedWings: Math.random() < 0.3, hingedFlippers: Math.random() < 0.3,
+    });
+    $('activePresetTag').textContent = 'Random';
+    syncUI(); scheduleBuild(0);
+  });
+  $('btnWiggle').addEventListener('click', () => {
+    state.wiggle = !state.wiggle;
+    $('wiggleText').textContent = state.wiggle ? 'Stop Wiggle' : 'Wiggle Test';
+    if (!state.wiggle) resetPose(); else showToast('Swinging every hinge through its real range');
+  });
+  document.querySelectorAll('.cam-btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const v = { iso: [[11, 9, 13], [0, 0.8, 0]], joint: [[3.2, 3.4, 2.6], [0, 0.4, 0]], top: [[0, 22, 0.01], [0, 0, 0]], bottom: [[0, -16, 5], [0, 0, 0]] }[btn.dataset.cam];
+    if (btn.dataset.cam === 'joint' && model && model.joints[1]) {
+      const J = model.joints[1], sx = model.bodies[0].pos[0] - model.plan.segs[0].pos[0], sy = model.bodies[0].pos[1] - model.plan.segs[0].pos[1];
+      const [x, , z] = petToScene(J.world[0] + sx, J.world[1] + sy);
+      v[0] = [x + 2.4, 3.2, z + 2.6]; v[1] = [x, 0.4, z];
+    } else if (model && btn.dataset.cam !== 'joint') {
+      const [cx, , cz] = petToScene(0, 0);
+      v[0] = [v[0][0] + cx, v[0][1], v[0][2] + cz]; v[1] = [cx, v[1][1], cz];
+    }
+    camera.position.set(...v[0]); controls.target.set(...v[1]); controls.update();
+  }));
+
+  // --- 8. EXPORT
+  let downloadsCap = null;
+  function getDownloads() {
+    if (!window.claude || typeof window.claude.use !== 'function') return Promise.resolve(null);
+    if (!downloadsCap) downloadsCap = window.claude.use('downloads').catch(() => null);
+    return downloadsCap;
+  }
+  async function offerFile(filename, bytes) {
+    const dl = await getDownloads();
+    if (dl) {
+      // inside a Claude artifact: files are offered through the viewer, which accepts .zip
+      const zipName = filename.replace(/\.[^.]+$/, '') + '.zip';
+      const zip = await zipFiles([{ name: filename, data: bytes }]);
+      try { await dl.save({ filename: zipName, data: new Blob([zip]) }); showToast(`Saved ${zipName} (unzip for ${filename})`); }
+      catch (e) { if (e && e.code !== 'declined') showToast('Save is not available here: ' + (e.message || e.code), '⚠️'); }
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+    a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    showToast(`Exported ${filename}`);
+  }
+  const SLOT_NAMES = { 1: 'Body', 2: 'Accents', 3: 'Eyes', 4: 'Hinge knobs' };
+  const bodyName = i => i === 0 ? 'Head' : `Segment ${i}`;
+  const extruderFor = slot => state.colorMode === 'ams' ? +slot : 1;
+  const baseName = () => `cuteflexi-${state.head}-${state.segments}seg-${state.jointType === 'chain' ? 'barrel' : state.jointType === 'double' ? 'twinlip' : 'wide'}-${state.printer}`;
+  const allMeshes = () => [
+    ...model.bodies.flatMap(b => [...Object.values(b.parts), ...b.flaps.flatMap(fl => Object.values(fl.parts))]),
+    ...model.kit.map(k => k.mesh)];
+
+  $('btnExport3MF').addEventListener('click', async () => {
+    if (!model) return;
+    if (!model.placement || !model.placement.fits) { showToast('This pet does not fit this plate: curl it or pick a bigger printer', '⚠️'); return; }
+    const pet = { name: `CuteFlexi ${state.head}`, position: [0, 0], parts: [] };
+    for (const b of model.bodies) {
+      for (const [slot, mesh] of Object.entries(b.parts)) pet.parts.push({ name: `${bodyName(b.index)} · ${SLOT_NAMES[slot]}`, extruder: extruderFor(slot), ...mesh });
+      for (const fl of b.flaps) for (const [slot, mesh] of Object.entries(fl.parts)) {
+        pet.parts.push({ name: `${bodyName(b.index)} · ${fl.kind} ${fl.side > 0 ? 'left' : 'right'}`, extruder: extruderFor(slot), ...mesh });
+      }
+    }
+    const objects = [pet];
+    for (const k of model.kit) objects.push({ name: `Kit ${k.name}`, position: [0, 0], parts: [{ name: `Kit ${k.name}`, extruder: 1, ...k.mesh }] });
+    const [W, H] = spec().bed;
+    const bytes = await build3MF({
+      title: `CuteFlexi ${state.head}`, objects, bedCenter: [W / 2, H / 2], placement: model.placement,
+      objectSettings: { brim_type: 'no_brim', enable_support: '0' },
+      layerChange: state.colorMode === 'layer' ? { z: model.layerChangeZ, color: state.colSecondary } : null,
+    });
+    offerFile(`${baseName()}.3mf`, bytes);
+  });
+
+  const shiftMesh = (m, dx, dy) => {
+    const p = new Float32Array(m.positions);
+    for (let k = 0; k < p.length; k += 3) { p[k] += dx; p[k + 1] += dy; }
+    return { positions: p, indices: m.indices };
+  };
+  // add-on pack: its own 3MF, every add-on its own object (brim and supports off), placed
+  // on this printer's plate clear of keep-out zones and the prime tower
+  $('btnExportAddons').addEventListener('click', async () => {
+    if (!model) return;
+    if (!model.packAddons.length) { showToast('Turn a port on and pick at least one add-on', '⚠️'); return; }
+    const pp = model.packPlacement;
+    if (!pp || !pp.fits) { showToast('The add-on pack does not fit this plate: pick fewer add-ons', '⚠️'); return; }
+    const objects = model.packAddons.map(a => {
+      const [dx, dy] = a.packOffset, parts = [];
+      for (const [slot, mesh] of Object.entries(a.parts)) parts.push({ name: `${a.name} · ${a.flaps.length ? 'hub and peg' : 'body and peg'}`, extruder: extruderFor(slot), ...shiftMesh(mesh, dx, dy) });
+      a.flaps.forEach((fl, j) => { for (const [slot, mesh] of Object.entries(fl.parts)) parts.push({ name: `${a.name} · plate ${j + 1}`, extruder: extruderFor(slot), ...shiftMesh(mesh, dx, dy) }); });
+      return { name: `CuteFlexi add-on: ${a.name}`, position: [0, 0], parts };
+    });
+    const [W, H] = spec().bed;
+    const bytes = await build3MF({
+      title: 'CuteFlexi add-on pack', objects, bedCenter: [W / 2, H / 2], placement: pp,
+      objectSettings: { brim_type: 'no_brim', enable_support: '0' },
+    });
+    offerFile(`${baseName()}-addons.3mf`, bytes);
+  });
+
+  function stlBinary(meshes) {
+    let n = 0; for (const m of meshes) n += m.indices.length / 3;
+    const buf = new ArrayBuffer(84 + 50 * n), dv = new DataView(buf);
+    dv.setUint32(80, n, true);
+    let o = 84;
+    for (const m of meshes) {
+      const p = m.positions, t = m.indices;
+      for (let k = 0; k < t.length; k += 3) {
+        const a = t[k] * 3, b = t[k + 1] * 3, c = t[k + 2] * 3;
+        const ux = p[b] - p[a], uy = p[b + 1] - p[a + 1], uz = p[b + 2] - p[a + 2];
+        const vx = p[c] - p[a], vy = p[c + 1] - p[a + 1], vz = p[c + 2] - p[a + 2];
+        let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+        const l = Math.hypot(nx, ny, nz) || 1;
+        const vals = [nx / l, ny / l, nz / l, p[a], p[a + 1], p[a + 2], p[b], p[b + 1], p[b + 2], p[c], p[c + 1], p[c + 2]];
+        for (let q = 0; q < 12; q++) dv.setFloat32(o + q * 4, vals[q], true);
+        o += 50;
+      }
+    }
+    return new Uint8Array(buf);
+  }
+  $('btnExportSTL').addEventListener('click', () => { if (model) offerFile(`${baseName()}-all.stl`, stlBinary(allMeshes())); });
+  document.querySelectorAll('.slot-export-btn').forEach(btn => btn.addEventListener('click', () => {
+    if (!model) return;
+    const slot = btn.dataset.slot;
+    const meshes = [
+      ...model.bodies.flatMap(b => [b.parts[slot], ...b.flaps.map(fl => fl.parts[slot])]).filter(Boolean),
+      ...model.kit.filter(k => String(k.slot) === slot).map(k => k.mesh)];
+    if (!meshes.length) { showToast(`Nothing uses slot ${slot} in this workflow`, 'ℹ️'); return; }
+    offerFile(`${baseName()}-slot${slot}-${SLOT_NAMES[slot].replace(' ', '')}.stl`, stlBinary(meshes));
+  }));
+
+  // --- 9. LOOP
+  const clock = new THREE.Clock();
+  function animate() {
+    requestAnimationFrame(animate);
+    if (state.wiggle && model) {
+      const t = clock.getElapsedTime();
+      if (model.joints.length) {
+        applyPose(model.joints.map((J, i) => {
+          const lim = J.S * 0.92;
+          return Math.max(-lim, Math.min(lim, model.plan.delta[i] + J.S * 0.85 * Math.sin(t * 2.2 - i * 0.8)));
+        }));
+      }
+      setFlaps(45 + 45 * Math.sin(t * 3.1));
+    }
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  function onResize() {
+    const w = container.clientWidth, h = Math.max(1, container.clientHeight);
+    camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
+  }
+  window.addEventListener('resize', onResize);
+  // inspection handle for tests and screenshots (camera, controls, live state)
+  window.__cuteflexi = { camera, controls, state, getModel: () => model, petToScene };
+  new ResizeObserver(onResize).observe(container);
+
+  syncUI();
+  buildPrinterBed();
+  animate();
+  try {
+    await loadEngine();
+    $('engineVeil').style.opacity = '0';
+    setTimeout(() => { $('engineVeil').hidden = true; }, 350);
+    runBuild();
+    const [cx, , cz] = petToScene(0, 0);
+    controls.target.set(cx, 0.8, cz); camera.position.set(cx + 11, 9, cz + 13); controls.update();
+  } catch (err) {
+    console.error(err);
+    $('engineMsg').textContent = 'The geometry engine could not start in this browser (WebAssembly is blocked or unsupported).';
+  }
+
+</script>
